@@ -6,6 +6,8 @@ using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Host;
 using Microsoft.Extensions.Logging;
 using Microsoft.Hadoop.Avro.Container;
+using Newtonsoft.Json;
+using Npgsql;
 
 namespace VirratHacklab.IoT
 {
@@ -14,26 +16,64 @@ namespace VirratHacklab.IoT
         [FunctionName("RuuviDataIngestion")]
         public static void Run([BlobTrigger("iot/virrat-hacklab-hub/virrat-hacklab-iot-ruuvi/{name}", Connection = "AzureWebJobsStorage")]Stream telemetry, string name, ILogger log)
         {
-            using (var reader = AvroContainer.CreateGenericReader(telemetry))
+            using (var connection = new NpgsqlConnection(Environment.GetEnvironmentVariable("PGSQL_CONNECTIONSTRING")))
             {
-                while (reader.MoveNext())
+                connection.Open();
+
+                using (NpgsqlTransaction transaction = connection.BeginTransaction())
                 {
-                    foreach (dynamic result in reader.Current.Objects)
+                    try
                     {
-                        var record = new AvroEventData(result);
-                        var sequenceNumber = record.SequenceNumber;
-                        var bodyText = Encoding.UTF8.GetString(record.Body);
-                        Console.WriteLine($"{sequenceNumber}: {bodyText}");
-                        log.LogInformation($"C# Blob trigger function Processed blob\n Name:{name} \n Size: {telemetry.Length} Bytes \n body: {bodyText}");
+                        using (var reader = AvroContainer.CreateGenericReader(telemetry))
+                        {
+                            while (reader.MoveNext())
+                            {
+                                foreach (dynamic result in reader.Current.Objects)
+                                {
+                                    var record = new AvroRuuviConditionsData(result);
+                                    var sequenceNumber = record.SequenceNumber;
+                                    var json = Encoding.UTF8.GetString(record.Body);
+                                    RuuviTelemetry ruuviTelemetry = JsonConvert.DeserializeObject<RuuviTelemetry>(json);
+
+                                    log.LogInformation($"RuuviDataIngestion Processed blob\n Name:{name} \n Size: {telemetry.Length} Bytes \n body: {json}");
+
+                                    using (var command = connection.CreateCommand())
+                                    {
+                                        command.CommandText = "insert into telemetry " +
+                                            "(time, device_id, parameters) values " +
+                                            "(@datetime, (select id from device where address='@mac')," +
+                                            "ROW(@temperature, @humidity, @pressure, @voltage, @txPower))";
+
+                                        command.Parameters.AddWithValue("@datetime", ruuviTelemetry.datetime);
+                                        command.Parameters.AddWithValue("@mac", ruuviTelemetry.device.address);
+                                        command.Parameters.AddWithValue("@temperature", ruuviTelemetry.sensors.temperature);
+                                        command.Parameters.AddWithValue("@humidity", ruuviTelemetry.sensors.humidity);
+                                        command.Parameters.AddWithValue("@pressure", ruuviTelemetry.sensors.pressure);
+                                        command.Parameters.AddWithValue("@voltage", ruuviTelemetry.sensors.voltage);
+                                        command.Parameters.AddWithValue("@txPower", ruuviTelemetry.sensors.txPower);
+
+                                        command.ExecuteNonQuery();
+                                    }
+                                }
+                                transaction.Commit();
+                                connection.Close();
+                            }
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        log.LogError("Transaction failed: " + e.Message);
+                        transaction.Rollback();
+                        connection.Close();
                     }
                 }
             }
-
         }
     }
-    public struct AvroEventData
+
+    public struct AvroRuuviConditionsData
     {
-        public AvroEventData(dynamic record)
+        public AvroRuuviConditionsData(dynamic record)
         {
             SequenceNumber = (long)record.SequenceNumber;
             Offset = (string)record.Offset;
@@ -50,5 +90,49 @@ namespace VirratHacklab.IoT
         public Dictionary<string, object> Properties { get; set; }
         public byte[] Body { get; set; }
     }
+    /* {
+     *      "device": {
+     *          "address":"e4:f7:db:2b:8c:c9","type":"LE Random"
+     *      },
+     *      "rssi":-28,
+     *      "sensors": {
+     *          "humidity":21,
+     *          "temperature":22.6,
+     *          "pressure":99605,
+     *          "accelerationX":-0.06,
+     *          "accelerationY":-0.024,
+     *          "accelerationZ":1.048,
+     *          "voltage":2869,
+     *          "txpower":31,
+     *          "movementCount":255,
+     *          "sequence":65535
+     *      }
+     * }*/
+    public class RuuviDevice
+    {
+        public string address { get; set; }
+        public string type { get; set; }
+    }
 
+    public class RuuviSensors
+    {
+        public int humidity { get; set; }
+        public double temperature { get; set; }
+        public int pressure { get; set; }
+        public int accelerationX { get; set; }
+        public int accelerationY { get; set; }
+        public int accelerationZ { get; set; }
+        public int txPower { get; set; }
+        public int voltage { get; set; }
+        public int movementCount { get; set; }
+        public int sequence { get; set; }
+    }
+
+    public class RuuviTelemetry
+    {
+        public RuuviDevice device { get; set; }
+        public int rssi { get; set; }
+        public RuuviSensors sensors { get; set; }
+        public DateTime datetime { get; set; }
+    }
 }
