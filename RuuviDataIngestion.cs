@@ -12,7 +12,7 @@ namespace VirratHacklab.IoT
     public static class RuuviDataIngestion
     {
         [FunctionName("RuuviDataIngestion")]
-        public static void Run([BlobTrigger("iot/virrat-hacklab-hub/virrat-hacklab-iot-ruuvi/{name}", Connection = "VirratHacklabCoolStorage")]Stream telemetry, string name, ILogger log)
+        public static void Run([BlobTrigger("iot/virrat-hacklab-hub/virrat-hacklab-iot-ruuvi/{name}", Connection = "AzureWebJobsStorage")]Stream telemetry, string name, ILogger log)
         {
             using (var reader = AvroContainer.CreateGenericReader(telemetry))
             {
