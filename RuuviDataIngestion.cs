@@ -39,7 +39,7 @@ namespace VirratHacklab.IoT
 
                                     using (var command = connection.CreateCommand())
                                     {
-                                        command.CommandText = "insert into telemetry " +
+                                        command.CommandText = "insert into ruuvi_telemetry " +
                                             "(time, device_id, parameters) values " +
                                             "(@datetime, (select id from device where address='@mac')," +
                                             "ROW(@temperature, @humidity, @pressure, @voltage, @txPower))";
