@@ -1,8 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text;
-using System.Collections.Generic;
 using Microsoft.Azure.WebJobs;
+using Microsoft.Azure.WebJobs.Host;
 using Microsoft.Extensions.Logging;
 using Microsoft.Hadoop.Avro.Container;
 
@@ -11,7 +12,7 @@ namespace VirratHacklab.IoT
     public static class RuuviDataIngestion
     {
         [FunctionName("RuuviDataIngestion")]
-        public static void Run([BlobTrigger("iot/virrat-hacklab-hub/virrat-hacklab-ruuvi-iot/{name}", Connection = "AzureWebJobsStorage")]Stream telemetry, string name, ILogger log)
+        public static void Run([BlobTrigger("iot/virrat-hacklab-hub/virrat-hacklab-iot-ruuvi/{name}", Connection = "VirratHacklabCoolStorage")]Stream telemetry, string name, ILogger log)
         {
             using (var reader = AvroContainer.CreateGenericReader(telemetry))
             {
@@ -27,19 +28,20 @@ namespace VirratHacklab.IoT
                     }
                 }
             }
+
         }
     }
     public struct AvroEventData
     {
         public AvroEventData(dynamic record)
         {
-            SequenceNumber = (long) record.SequenceNumber;
-            Offset = (string) record.Offset;
-            DateTime.TryParse((string) record.EnqueuedTimeUtc, out var enqueuedTimeUtc);
+            SequenceNumber = (long)record.SequenceNumber;
+            Offset = (string)record.Offset;
+            DateTime.TryParse((string)record.EnqueuedTimeUtc, out var enqueuedTimeUtc);
             EnqueuedTimeUtc = enqueuedTimeUtc;
-            SystemProperties = (Dictionary<string, object>) record.SystemProperties;
-            Properties = (Dictionary<string, object>) record.Properties;
-            Body = (byte[]) record.Body;
+            SystemProperties = (Dictionary<string, object>)record.SystemProperties;
+            Properties = (Dictionary<string, object>)record.Properties;
+            Body = (byte[])record.Body;
         }
         public long SequenceNumber { get; set; }
         public string Offset { get; set; }
