@@ -119,9 +119,9 @@ namespace VirratHacklab.IoT
         public double humidity { get; set; }
         public double temperature { get; set; }
         public int pressure { get; set; }
-        public int accelerationX { get; set; }
-        public int accelerationY { get; set; }
-        public int accelerationZ { get; set; }
+        public double accelerationX { get; set; }
+        public double accelerationY { get; set; }
+        public double accelerationZ { get; set; }
         public int txPower { get; set; }
         public int voltage { get; set; }
         public int movementCount { get; set; }
