@@ -116,7 +116,7 @@ namespace VirratHacklab.IoT
 
     public class RuuviSensors
     {
-        public int humidity { get; set; }
+        public double humidity { get; set; }
         public double temperature { get; set; }
         public int pressure { get; set; }
         public int accelerationX { get; set; }
