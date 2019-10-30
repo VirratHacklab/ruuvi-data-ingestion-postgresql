@@ -63,10 +63,10 @@ namespace VirratHacklab.IoT
                         {
                             command.CommandText = "insert into ruuvi_telemetry " +
                                 "(device_id, time, parameters) values " +
-                                "((select id from device where address='@mac'), @datetime, ROW(@temperature, @humidity, @pressure, @voltage, @txPower))";
+                                "((select id from device where address=@mac), @datetime, ROW(@temperature, @humidity, @pressure, @voltage, @txPower))";
 
-                            command.Parameters.AddWithValue("@datetime", ruuviTelemetry.datetime);
                             command.Parameters.AddWithValue("@mac", ruuviTelemetry.device.address);
+                            command.Parameters.AddWithValue("@datetime", ruuviTelemetry.datetime);
                             command.Parameters.AddWithValue("@temperature", ruuviTelemetry.sensors.temperature);
                             command.Parameters.AddWithValue("@humidity", ruuviTelemetry.sensors.humidity);
                             command.Parameters.AddWithValue("@pressure", ruuviTelemetry.sensors.pressure);
