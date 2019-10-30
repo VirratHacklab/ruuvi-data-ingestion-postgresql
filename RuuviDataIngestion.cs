@@ -21,17 +21,21 @@ namespace VirratHacklab.IoT
 
             using (var reader = AvroContainer.CreateGenericReader(telemetry))
             {
+                log.LogInformation($"Processing file: {name}, Size: {telemetry.Length}");
                 while (reader.MoveNext())
                 {
+                    log.LogInformation($"Processing results");
                     foreach (dynamic result in reader.Current.Objects)
                     {
                         var record = new AvroRuuviConditionsData(result);
+                        log.LogInformation($"Adding {record} to list");
                         conditions.Add(record);
                     }
                 }
             }
-
+            log.LogInformation($"Initializing writer");
             RuuviDataWriter writer = new RuuviDataWriter();
+            log.LogInformation($"Writing data to database");
             writer.insertRuuviConditionsData(conditions, log);
         }    
     }
