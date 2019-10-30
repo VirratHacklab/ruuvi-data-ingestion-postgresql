@@ -54,7 +54,7 @@ namespace VirratHacklab.IoT
                             }
                             transaction.Commit();
                             connection.Close();
-                            log.LogInformation($"RuuviDataIngestion Processed blob\n Name:{name} \n Size: {telemetry.Length} Bytes \n body: {json}");
+                            log.LogInformation($"RuuviDataIngestion Processed blob\n Name:{name} \n Size: {telemetry.Length}");
                         }
                     }
                 }
