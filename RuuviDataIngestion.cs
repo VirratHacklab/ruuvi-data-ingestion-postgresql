@@ -133,6 +133,6 @@ namespace VirratHacklab.IoT
         public RuuviDevice device { get; set; }
         public int rssi { get; set; }
         public RuuviSensors sensors { get; set; }
-        public DateTime datetime { get; set; }
+        public string datetime { get; set; }
     }
 }
