@@ -22,49 +22,40 @@ namespace VirratHacklab.IoT
 
                 using (NpgsqlTransaction transaction = connection.BeginTransaction())
                 {
-                    try
+                    using (var reader = AvroContainer.CreateGenericReader(telemetry))
                     {
-                        using (var reader = AvroContainer.CreateGenericReader(telemetry))
+                        while (reader.MoveNext())
                         {
-                            while (reader.MoveNext())
+                            foreach (dynamic result in reader.Current.Objects)
                             {
-                                foreach (dynamic result in reader.Current.Objects)
+                                var record = new AvroRuuviConditionsData(result);
+                                var sequenceNumber = record.SequenceNumber;
+                                var json = Encoding.UTF8.GetString(record.Body);
+                                RuuviTelemetry ruuviTelemetry = JsonConvert.DeserializeObject<RuuviTelemetry>(json);
+
+                                log.LogInformation($"Processing: {json}");
+
+                                using (var command = connection.CreateCommand())
                                 {
-                                    var record = new AvroRuuviConditionsData(result);
-                                    var sequenceNumber = record.SequenceNumber;
-                                    var json = Encoding.UTF8.GetString(record.Body);
-                                    RuuviTelemetry ruuviTelemetry = JsonConvert.DeserializeObject<RuuviTelemetry>(json);
+                                    command.CommandText = "insert into ruuvi_telemetry " +
+                                        "(device_id, time, parameters) values " +
+                                        "((select id from device where address='@mac'), @datetime, ROW(@temperature, @humidity, @pressure, @voltage, @txPower))";
 
-                                    log.LogInformation($"RuuviDataIngestion Processed blob\n Name:{name} \n Size: {telemetry.Length} Bytes \n body: {json}");
+                                    command.Parameters.AddWithValue("@datetime", ruuviTelemetry.datetime);
+                                    command.Parameters.AddWithValue("@mac", ruuviTelemetry.device.address);
+                                    command.Parameters.AddWithValue("@temperature", ruuviTelemetry.sensors.temperature);
+                                    command.Parameters.AddWithValue("@humidity", ruuviTelemetry.sensors.humidity);
+                                    command.Parameters.AddWithValue("@pressure", ruuviTelemetry.sensors.pressure);
+                                    command.Parameters.AddWithValue("@voltage", ruuviTelemetry.sensors.voltage);
+                                    command.Parameters.AddWithValue("@txPower", ruuviTelemetry.sensors.txPower);
 
-                                    using (var command = connection.CreateCommand())
-                                    {
-                                        command.CommandText = "insert into ruuvi_telemetry " +
-                                            "(time, device_id, parameters) values " +
-                                            "(@datetime, (select id from device where address='@mac')," +
-                                            "ROW(@temperature, @humidity, @pressure, @voltage, @txPower))";
-
-                                        command.Parameters.AddWithValue("@datetime", ruuviTelemetry.datetime);
-                                        command.Parameters.AddWithValue("@mac", ruuviTelemetry.device.address);
-                                        command.Parameters.AddWithValue("@temperature", ruuviTelemetry.sensors.temperature);
-                                        command.Parameters.AddWithValue("@humidity", ruuviTelemetry.sensors.humidity);
-                                        command.Parameters.AddWithValue("@pressure", ruuviTelemetry.sensors.pressure);
-                                        command.Parameters.AddWithValue("@voltage", ruuviTelemetry.sensors.voltage);
-                                        command.Parameters.AddWithValue("@txPower", ruuviTelemetry.sensors.txPower);
-
-                                        command.ExecuteNonQuery();
-                                    }
+                                    command.ExecuteNonQuery();
                                 }
-                                transaction.Commit();
-                                connection.Close();
                             }
+                            transaction.Commit();
+                            connection.Close();
+                            log.LogInformation($"RuuviDataIngestion Processed blob\n Name:{name} \n Size: {telemetry.Length} Bytes \n body: {json}");
                         }
-                    }
-                    catch (Exception e)
-                    {
-                        log.LogError("Transaction failed: " + e.Message);
-                        transaction.Rollback();
-                        connection.Close();
                     }
                 }
             }
